@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 笔记总结助手 · 开源版</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --primary: #4A90D9;
+    --primary-light: #6BA5E7;
+    --primary-dark: #3570B0;
+    --primary-bg: #F0F6FF;
+    --bg: #F5F7FA;
+    --card-bg: #FFFFFF;
+    --text: #2C3E50;
+    --text-secondary: #7F8C8D;
+    --border: #E1E8ED;
+    --success: #27AE60;
+    --warning: #F39C12;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    --radius: 12px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  .header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    padding: 20px 32px;
+    text-align: center;
+  }
+  .header h1 { font-size: 24px; font-weight: 700; letter-spacing: 1px; }
+  .header p { font-size: 14px; opacity: 0.85; margin-top: 4px; }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .input-panel {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    position: sticky;
+    top: 24px;
+  }
+  .input-panel h2 {
+    font-size: 18px;
+    margin-bottom: 14px;
+    color: var(--primary);
+  }
+
+  /* API Key 配置区 */
+  .api-config {
+    background: #FFFDE7;
+    border: 1px solid #FDD835;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+  .api-config label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #F57F17;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .api-config input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1.5px solid #FDD835;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+  }
+  .api-config input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(74,144,217,0.12);
+  }
+  .api-config .api-hint {
+    font-size: 11px;
+    color: #999;
+    margin-top: 4px;
+  }
+  .api-config .api-status {
+    font-size: 12px;
+    color: var(--success);
+    margin-top: 4px;
+    display: none;
+  }
+  .api-config .api-status.show { display: block; }
+  .api-config .api-status.err { color: #E74C3C; }
+
+  .input-panel textarea {
+    width: 100%;
+    height: 360px;
+    padding: 16px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    line-height: 1.7;
+    resize: vertical;
+    transition: border-color 0.2s;
+    font-family: inherit;
+    outline: none;
+  }
+  .input-panel textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(74,144,217,0.12);
+  }
+
+  .input-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .word-count { transition: color 0.2s; }
+  .word-count.over { color: #E74C3C; font-weight: 600; }
+
+  .btn-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn-primary {
+    background: var(--primary);
+    color: #fff;
+    flex: 1;
+  }
+  .btn-primary:hover { background: var(--primary-light); }
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .btn-secondary {
+    background: #E8EDF2;
+    color: var(--text-secondary);
+  }
+  .btn-secondary:hover { background: #D5DCE4; }
+
+  .output-panel { min-height: 200px; }
+
+  .output-empty {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 60px 24px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+  .output-empty .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.6; }
+  .output-empty p { font-size: 15px; }
+
+  .result-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .result-card .card-header {
+    padding: 14px 20px;
+    font-weight: 700;
+    font-size: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .result-card .card-body {
+    padding: 16px 20px;
+    line-height: 1.8;
+    font-size: 14.5px;
+    user-select: text;
+  }
+
+  .module-keywords .card-header { background: #FFF3E0; color: #E67E22; }
+  .module-keywords .card-body { background: #FFFBF0; }
+  .module-core .card-header { background: #E8F5E9; color: #27AE60; }
+  .module-core .card-body { background: #F5FDF6; }
+  .module-summary .card-header { background: #E3F2FD; color: var(--primary); }
+  .module-summary .card-body { background: #F5FAFF; }
+  .module-question .card-header { background: #F3E5F5; color: #8E44AD; }
+  .module-question .card-body { background: #FBF5FC; }
+
+  .card-body blockquote {
+    border-left: 3px solid var(--primary);
+    padding-left: 12px;
+    margin: 6px 0;
+    color: var(--text-secondary);
+  }
+  .card-body ul { padding-left: 20px; }
+  .card-body li { margin-bottom: 4px; }
+
+  .copy-btn {
+    padding: 3px 10px;
+    font-size: 12px;
+    background: transparent;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: inherit;
+    opacity: 0.65;
+  }
+  .copy-btn:hover { opacity: 1; }
+
+  .loading-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--primary);
+  }
+  .loading-spinner {
+    display: inline-block;
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .export-bar {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    justify-content: flex-end;
+  }
+  .btn-export {
+    background: var(--success);
+    color: #fff;
+  }
+  .btn-export:hover { background: #2ECC71; }
+
+  .history-section {
+    max-width: 1400px;
+    margin: 0 auto 40px;
+    padding: 0 24px;
+  }
+  .history-section h3 {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .history-item {
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 12px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .history-item:hover { background: var(--primary-bg); }
+  .history-item .h-time { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+  .history-item .h-preview {
+    flex: 1;
+    margin: 0 16px;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .history-empty {
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 12px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 960px) {
+    .container { grid-template-columns: 1fr; }
+    .input-panel { position: static; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📝 AI 笔记总结助手 · 开源版</h1>
+  <p>请先填入你的 DeepSeek API Key，粘贴笔记即可 AI 自动总结</p>
+</div>
+
+<div class="container">
+  <div class="input-panel">
+    <h2>📋 输入笔记</h2>
+
+    <!-- API Key 配置区 -->
+    <div class="api-config">
+      <label>🔑 DeepSeek API Key</label>
+      <input type="password" id="apiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" oninput="onKeyChange()">
+      <div class="api-hint">需要 DeepSeek API Key，在 platform.deepseek.com 获取</div>
+      <div class="api-status" id="apiStatus">✅ Key 已保存</div>
+    </div>
+
+    <textarea id="noteInput" placeholder="在此粘贴笔记内容或长文本…" oninput="updateWordCount()"></textarea>
+    <div class="input-meta">
+      <span>字数：<span id="wordCount" class="word-count">0</span></span>
+      <span id="statusHint">就绪</span>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" id="summarizeBtn" onclick="summarize()">✨ 开始总结</button>
+      <button class="btn btn-secondary" onclick="clearAll()">🗑️ 清空</button>
+      <button class="btn btn-secondary" onclick="resetAll()">🔄 重置</button>
+    </div>
+  </div>
+
+  <div class="output-panel" id="outputPanel">
+    <div class="output-empty">
+      <div class="icon">📄</div>
+      <p>输入笔记后点击「开始总结」</p>
+    </div>
+  </div>
+</div>
+
+<div class="history-section">
+  <h3>📜 历史记录</h3>
+  <div class="history-list" id="historyList">
+    <div class="history-empty">暂无记录</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // =============================================
+  // 开源版 - 用户自行填入 DeepSeek API Key
+  // Key 保存在 localStorage 中，不会上传到任何第三方
+  // =============================================
+  const API_URL = 'https://api.deepseek.com/v1/chat/completions';
+  const MODEL   = 'deepseek-chat';
+  const STORAGE_KEY = 'notes_history_open_v2';
+
+  let currentData = null;
+
+  // ---- API Key 管理 ----
+  function loadApiKey() {
+    const saved = localStorage.getItem('ds_api_key_open');
+    if (saved) {
+      document.getElementById('apiKeyInput').value = saved;
+      return saved;
+    }
+    return '';
+  }
+  function saveApiKey(key) {
+    localStorage.setItem('ds_api_key_open', key);
+  }
+  function getApiKey() {
+    return document.getElementById('apiKeyInput').value.trim();
+  }
+
+  function onKeyChange() {
+    const key = getApiKey();
+    const status = document.getElementById('apiStatus');
+    if (key.length > 10 && key.startsWith('sk-')) {
+      saveApiKey(key);
+      status.textContent = '✅ Key 已保存在本地';
+      status.className = 'api-status show';
+    } else if (key.length > 0) {
+      status.textContent = '⚠️ Key 格式不正确（应以 sk- 开头）';
+      status.className = 'api-status show err';
+    } else {
+      status.className = 'api-status';
+    }
+  }
+
+  // ---- 字数 ----
+  function updateWordCount() {
+    const el = document.getElementById('noteInput');
+    const cnt = document.getElementById('wordCount');
+    const len = el.value.length;
+    cnt.textContent = len;
+    cnt.className = 'word-count' + (len > 5000 ? ' over' : '');
+  }
+
+  // ---- Toast ----
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._hide);
+    t._hide = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // ---- localStorage 历史 ----
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch { return []; }
+  }
+  function saveHistory(list) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  }
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = typeof s === 'string' ? s.slice(0, 80) : String(s).slice(0, 80);
+    return d.innerHTML;
+  }
+  function renderHistory() {
+    const list = loadHistory();
+    const el = document.getElementById('historyList');
+    if (!list.length) {
+      el.innerHTML = '<div class="history-empty">暂无记录</div>';
+      return;
+    }
+    el.innerHTML = list.map((item, idx) => {
+      const date = new Date(item.time);
+      const timeStr = `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      const preview = item.core || item.keywords || '(无内容)';
+      return `<div class="history-item" onclick="restoreHistory(${idx})">
+        <span class="h-time">${timeStr}</span>
+        <span class="h-preview">${escapeHtml(preview)}</span>
+        <span style="font-size:12px;color:var(--primary);">查看 →</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ---- 清空 ----
+  function clearAll() {
+    document.getElementById('noteInput').value = '';
+    updateWordCount();
+    document.getElementById('outputPanel').innerHTML =
+      '<div class="output-empty"><div class="icon">📄</div><p>输入笔记后点击「开始总结」</p></div>';
+    document.getElementById('statusHint').textContent = '就绪';
+    currentData = null;
+  }
+
+  // ---- 重置（清空所有，含历史记录，不含 API Key）----
+  function resetAll() {
+    if (!confirm('确定重置所有数据？\n输入区、展示区、历史记录将全部清空。\n（API Key 不受影响）')) return;
+    clearAll();
+    localStorage.removeItem(STORAGE_KEY);
+    renderHistory();
+    showToast('🔄 已重置');
+  }
+
+  // ---- 复制 ----
+  function copyText(moduleIndex) {
+    if (!currentData) return;
+    const texts = [currentData.keywords, currentData.core, currentData.summary, currentData.question];
+    const text = texts[moduleIndex] || '';
+    if (!text) { showToast('⚠️ 内容为空'); return; }
+    navigator.clipboard.writeText(text).then(() => showToast('✅ 已复制')).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('✅ 已复制');
+    });
+  }
+
+  // ---- 导出 PDF ----
+  function exportPDF() {
+    if (!currentData) { showToast('⚠️ 暂无内容可导出'); return; }
+    const d = currentData;
+
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    script.onload = () => {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+      loadExtraLib(doc, d);
+    };
+    script.onerror = () => showToast('⚠️ 加载 PDF 库失败，请检查网络');
+    document.head.appendChild(script);
+  }
+
+  function loadExtraLib(doc, d) {
+    const s2 = document.createElement('script');
+    s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s2.onload = () => generatePDF(doc, d);
+    s2.onerror = () => showToast('⚠️ 加载渲染库失败');
+    document.head.appendChild(s2);
+  }
+
+  function generatePDF(doc, d) {
+    const div = document.createElement('div');
+    div.style.cssText = 'width:700px;padding:40px;font-family:-apple-system,sans-serif;background:#fff;color:#2C3E50;line-height:1.8;';
+    div.innerHTML = `
+      <h1 style="font-size:22px;text-align:center;color:#4A90D9;border-bottom:2px solid #4A90D9;padding-bottom:10px;">📝 笔记总结报告</h1>
+      <p style="text-align:center;color:#999;font-size:12px;margin-bottom:20px;">${new Date().toLocaleString('zh-CN')}</p>
+      <hr style="border:none;border-top:1px solid #ddd;">
+      <h2 style="color:#E67E22;font-size:16px;margin-top:16px;">📌 关键词</h2>
+      <p style="font-size:14px;color:#555;">${escHTML(d.keywords||'(无)')}</p>
+      <h2 style="color:#27AE60;font-size:16px;margin-top:16px;">🎯 核心观点</h2>
+      <p style="font-size:14px;color:#555;">${escHTML(d.core||'(无)')}</p>
+      <h2 style="color:#4A90D9;font-size:16px;margin-top:16px;">📖 详细摘要</h2>
+      ${mdToSimpleHTML(d.summary)}
+      <h2 style="color:#8E44AD;font-size:16px;margin-top:16px;">❓ 思考题</h2>
+      <p style="font-size:14px;color:#555;">${escHTML(d.question||'(无)')}</p>
+      <hr style="border:none;border-top:1px solid #ddd;margin-top:20px;">
+      <p style="text-align:center;font-size:10px;color:#aaa;">由 DeepSeek 笔记总结助手生成</p>
+    `;
+    document.body.appendChild(div);
+
+    html2canvas(div, { scale: 2, useCORS: true, logging: false }).then(canvas => {
+      const imgData = canvas.toDataURL('image/png');
+      const pageW = 210;
+      const pageH = 297;
+      const margin = 10;
+      const imgW = pageW - margin * 2;
+      const imgH = (canvas.height / canvas.width) * imgW;
+
+      let heightLeft = imgH;
+      let position = margin;
+
+      doc.addImage(imgData, 'PNG', margin, position, imgW, imgH);
+      heightLeft -= (pageH - margin * 2);
+
+      while (heightLeft > 0) {
+        position = margin - (pageH - margin * 2);
+        doc.addPage();
+        doc.addImage(imgData, 'PNG', margin, position, imgW, imgH);
+        heightLeft -= (pageH - margin * 2);
+      }
+
+      doc.save('note-summary-' + formatDateFilename() + '.pdf');
+      document.body.removeChild(div);
+      showToast('📥 PDF 已下载');
+    }).catch(() => {
+      document.body.removeChild(div);
+      showToast('⚠️ PDF 生成失败');
+    });
+  }
+
+  function escHTML(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function mdToSimpleHTML(s) {
+    if (!s) return '<p style="font-size:14px;color:#555;">(无)</p>';
+    let h = escHTML(s);
+    const lines = h.split('\n');
+    let out = '', inUl = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (t.startsWith('- ')) {
+        if (!inUl) { out += '<ul style="font-size:14px;color:#555;">'; inUl = true; }
+        out += '<li>' + t.slice(2) + '</li>';
+      } else {
+        if (inUl) { out += '</ul>'; inUl = false; }
+        if (t) out += '<p style="font-size:14px;color:#555;">' + t + '</p>';
+      }
+    }
+    if (inUl) out += '</ul>';
+    return out;
+  }
+  function formatDateFilename() {
+    const d = new Date();
+    return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+  }
+
+  // ---- 展示结果 ----
+  function displayResult(data) {
+    const panel = document.getElementById('outputPanel');
+    const modules = [
+      { emoji: '📌', title: '关键词', key: 'keywords', cls: 'module-keywords' },
+      { emoji: '🎯', title: '核心观点', key: 'core', cls: 'module-core' },
+      { emoji: '📖', title: '详细摘要', key: 'summary', cls: 'module-summary' },
+      { emoji: '❓', title: '思考题', key: 'question', cls: 'module-question' },
+    ];
+    let html = '';
+    modules.forEach((m, i) => {
+      const body = renderMarkdown(data[m.key] || '');
+      html += `<div class="result-card ${m.cls}">
+        <div class="card-header">
+          <span>${m.emoji} ${m.title}</span>
+          <button class="copy-btn" onclick="copyText(${i})">复制</button>
+        </div>
+        <div class="card-body">${body}</div>
+      </div>`;
+    });
+    html += `<div class="export-bar">
+      <button class="btn btn-export" onclick="exportPDF()">📄 导出 PDF</button>
+    </div>`;
+    panel.innerHTML = html;
+  }
+
+  // ---- Markdown → HTML ----
+  function renderMarkdown(text) {
+    if (!text) return '';
+    let html = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`(.+?)`/g, '<code>$1</code>')
+      .replace(/^### (.+)$/gm, '<h5>$1</h5>')
+      .replace(/^## (.+)$/gm, '<h4>$1</h4>')
+      .replace(/^# (.+)$/gm, '<h3>$1</h3>')
+      .replace(/\n/g, '<br>');
+    const lines = html.split('<br>');
+    let inList = false;
+    const out = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (/^- /.test(trimmed)) {
+        if (!inList) { out.push('<ul>'); inList = true; }
+        out.push('<li>' + trimmed.slice(2) + '</li>');
+      } else {
+        if (inList) { out.push('</ul>'); inList = false; }
+        out.push(line);
+      }
+    }
+    if (inList) out.push('</ul>');
+    return out.join('');
+  }
+
+  // ---- 恢复历史 ----
+  function restoreHistory(idx) {
+    const list = loadHistory();
+    const item = list[idx];
+    if (!item) return;
+    currentData = item;
+    displayResult(item);
+    document.getElementById('noteInput').value = item._rawInput || '';
+    updateWordCount();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ---- 解析 AI 输出 ----
+  function parseResult(text) {
+    const res = { keywords: '', core: '', summary: '', question: '' };
+    const sections = text.split(/(?=📌\s*关键词|🎯\s*核心观点|📖\s*详细摘要|❓\s*思考题)/);
+    for (const sec of sections) {
+      const t = sec.trim();
+      if (!t) continue;
+      if (/^📌\s*关键词/.test(t))      res.keywords  = t.replace(/^📌\s*关键词[：:]\s*/, '').trim();
+      else if (/^🎯\s*核心观点/.test(t)) res.core     = t.replace(/^🎯\s*核心观点[：:]\s*/, '').trim();
+      else if (/^📖\s*详细摘要/.test(t))  res.summary   = t.replace(/^📖\s*详细摘要[：:]\s*/, '').trim();
+      else if (/^❓\s*思考题/.test(t))   res.question  = t.replace(/^❓\s*思考题[：:]\s*/, '').trim();
+    }
+    if (!res.keywords && !res.core && !res.summary && !res.question) {
+      const lines = text.split('\n');
+      for (const line of lines) {
+        const l = line.trim();
+        if (/^📌/.test(l)) res.keywords  = l.replace(/^📌[^：:]*[：:]\s*/, '');
+        else if (/^🎯/.test(l)) res.core = l.replace(/^🎯[^：:]*[：:]\s*/, '');
+        else if (/^📖/.test(l)) res.summary = l.replace(/^📖[^：:]*[：:]\s*/, '');
+        else if (/^❓/.test(l)) res.question = l.replace(/^❓[^：:]*[：:]\s*/, '');
+      }
+    }
+    return res;
+  }
+
+  // ---- 调用 API ----
+  async function summarize() {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      showToast('⚠️ 请先填入你的 DeepSeek API Key');
+      return;
+    }
+    if (!apiKey.startsWith('sk-')) {
+      showToast('⚠️ API Key 格式不正确');
+      return;
+    }
+
+    const input = document.getElementById('noteInput').value.trim();
+    if (!input) { showToast('⚠️ 请先输入笔记内容'); return; }
+    const btn = document.getElementById('summarizeBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 生成中…';
+    document.getElementById('statusHint').textContent = '⏳ 正在调用 AI…';
+    const panel = document.getElementById('outputPanel');
+    panel.innerHTML = `<div class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>AI 正在分析笔记，请稍候…</p>
+    </div>`;
+
+    const prompt = `你是一个专业的笔记总结助手。请根据以下笔记内容，严格按照下面的格式输出（Markdown 格式）：
+
+📌 关键词：提取 3-5 个关键词，以逗号分隔
+🎯 核心观点：用一句话概括笔记的核心观点
+📖 详细摘要：分点列出 3 个最重要的要点（每点一行，以 - 开头）
+❓ 思考题：提出 1 个值得进一步深入思考的问题
+
+注意：
+- 每个模块的标题必须严格使用上述 emoji + 中文标题
+- 思考题要具有启发性，而不是简单的事实回顾
+- 如果内容不足以满足某模块要求，如实说明
+
+笔记内容：
+\`\`\`
+${input.slice(0, 8000)}
+\`\`\``;
+
+    try {
+      const resp = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: MODEL, messages: [{ role: 'user', content: prompt }], max_tokens: 2048, temperature: 0.7 })
+      });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+      }
+      const json = await resp.json();
+      const content = json.choices?.[0]?.message?.content || '';
+      const parsed = parseResult(content);
+      parsed._rawInput = input;
+      currentData = parsed;
+      displayResult(parsed);
+      const history = loadHistory();
+      history.unshift({ ...parsed, time: Date.now() });
+      if (history.length > 50) history.length = 50;
+      saveHistory(history);
+      renderHistory();
+      document.getElementById('statusHint').textContent = '✅ 完成';
+      showToast('✅ 总结完成！');
+    } catch (err) {
+      panel.innerHTML = `<div class="output-empty">
+        <div class="icon">⚠️</div>
+        <p style="color:#E74C3C;">请求失败：${escapeHtml(err.message)}</p>
+      </div>`;
+      document.getElementById('statusHint').textContent = '❌ 失败';
+      showToast('❌ ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '✨ 开始总结';
+    }
+  }
+
+  // ---- 初始化 ----
+  document.addEventListener('DOMContentLoaded', () => {
+    loadApiKey();
+    renderHistory();
+    updateWordCount();
+  });
+</script>
+
+</body>
+</html>
